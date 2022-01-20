@@ -34,9 +34,17 @@ fun Route.noteRouting() {
                 "Missing or malformed id",
                 status = HttpStatusCode.BadRequest
             )
-            var note: Note? = null
+            val note: Note? = transaction {
+                NoteT.findById(id.toInt())?.getSerializable()
+            }
+
             transaction {
-                 note = NoteT.findById(id.toInt())?.getSerializable()
+                if(note != null){
+                    val links = NoteLinkT.find { NoteLinks.fromNote eq note.id}
+                    note.links = links.map{ link ->
+                        link.toNote.value
+                    }
+                }
             }
 
             if (note != null){
@@ -50,6 +58,7 @@ fun Route.noteRouting() {
         }
         post {
             val note = call.receive<Note>()
+            var responseNote:Note = Note(0,"","")
             transaction {
                 val tags = TagT.find { Tags.id inList note.tags}
                 val links = NoteT.find {Notes.id inList note.links}
@@ -70,10 +79,10 @@ fun Route.noteRouting() {
 
                 }
 
-
+                responseNote = newNote.getSerializable()
 
             }
-            call.respondText("Note stored correctly", status = HttpStatusCode.Created)
+            call.respond(responseNote)
         }
 
         patch("{id}") {
